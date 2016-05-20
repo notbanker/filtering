@@ -1,0 +1,77 @@
+import numpy as np
+
+def serialKalman( ys, sigmaHat=1.0, rHat = 1.0, a = 0.25, x0 = None ):
+    """ An 1-d Kalman filter where errors are assumed AR1 with coefficient a
+
+              Arguments
+              ---------
+              ys           [ float ]     List of previous observations in chronological order
+              sigmaHat     float         Estimate of std of  x_{t+1} - x{t}
+              rHat         float         Estimate of std of measurement error
+              a            float         Coefficient in AR1 process
+              x0           float         Optionally supply the initial guess of state before the first observation. This defaults
+                                         to y[0] and typically won't matter much unless the series is very short.
+
+              Returns
+              -------
+              xs          [ float ]      Estimate for next observation
+              Ps          [ float ]      State variance *before* observation
+
+        """
+    n = len(ys)
+    R = rHat**2      # rHat is a scale (std) parameter, R is variance of "measurement error"
+    V = R*(1-a**2)   # V is the variance of the error term driving the AR1 process (so as to make the total variance R)
+    Q  = sigmaHat**2 # sigmaHat is scale (std) parameter, Q is variance of diffusion step
+    if x0 is None:
+        x0 = ys[0]   #
+    x  = x0
+    P  = R           # Initials guess, shouldn't matter too much
+    for t in xrange(1,n):
+        P += Q               # Uncertainty increases with passage of time
+        K = (P+Q)/(P+Q+V)    # Note the difference between this and the case of uncorrelated errors, provided below for convenience
+        x += K*(ys[t] - x)   # Shrink towards observation
+        P += Q - K*(P+V)     # Again, different to the uncorrelated case below
+    return x, P
+
+
+def kalmanPrediction( ys, sigmaHat=1.0, rHat=1.0, x0=None ):
+     """ An extremely simple 1-d Kalman filter here for comparison
+
+           Arguments
+           ---------
+           ys           [ float ]     Observations
+           sigmaHat     float         Estimate of std of  x_{t+1} - x{t}
+           rHat         float         Estimate of std of measurement error
+
+           Returns
+           -------
+           xs          [ float ]      Estimate *before* observation
+           Ps          [ float ]      State variance *before* observation
+
+     """
+     n  = len( ys )
+     R  = rHat**2     # rHat is a scale (std) parameter, R is variance of "measurement error"
+     Q  = sigmaHat**2 # sigmaHat is scale (std) parameter, Q is variance of diffusion step
+     P  = R           # Initial guess, shouldn't matter too much
+     xs = np.ones( n )*float('nan')
+     Ps = np.ones( n )*float('nan')
+     if x0 is None:
+         x0 = ys[0]    # Cheating for first observation only
+     x  = x0
+
+     for t in xrange(1,n):
+         xs[t] = x
+         Ps[t] = P
+         P    += Q               # Uncertainty increases with passage of time
+         K     = P/(P+R)         # Gain is independent of observation
+         x    += K*( ys[t]-x )   # Shrink towards observation
+         P    *= (1-K)           # Seeing an observation reduces the variance
+     return xs, Ps
+
+
+if __name__ == '__main__':
+    import math
+    ys = [100, 100.12, 100.45, 99.34, 99.66, 99.8]
+    x, P = serialKalmanPrediction(ys=ys, sigmaHat=0.5)
+    print "The Kalman guess for " + str(ys) + ' is ' + str(round(x, 3)) + " +/- " + str(round(math.sqrt(P), 3))
+  
